@@ -26,35 +26,34 @@ intents.message_content = True
 client = commands.Bot(command_prefix="!", intents=intents)
 
 
-# This is a slash command that calls the GPT-3 API to generate a response and sends it back to the user on discord
-@client.tree.command(name='query_gpt', description='Ask GPT a question')
-@app_commands.describe(query = "Ask GPT a question")
-@app_commands.checks.cooldown(1, 60, key=lambda i: (i.guild_id, i.user.id)) # This prevents people from spamming the command. They can only use it once every 60 seconds.
-async def query_gpt(interaction: discord.Interaction, query: str):
+# # This is a slash command that calls the GPT-3 API to generate a response and sends it back to the user on discord
+# @client.tree.command(name='query_gpt', description='Ask GPT a question')
+# @app_commands.describe(query = "Ask GPT a question")
+# @app_commands.checks.cooldown(1, 60, key=lambda i: (i.guild_id, i.user.id)) # This prevents people from spamming the command. They can only use it once every 60 seconds.
+# async def query_gpt(interaction: discord.Interaction, query: str):
     
-    completion = openai_client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant"},
-            {"role": "user", "content": query}
-        ],
-    )
+#     completion = openai_client.chat.completions.create(
+#         model="gpt-3.5-turbo",
+#         messages = [
+#             {"role": "system", "content": "You are a helpful assistant"},
+#             {"role": "user", "content": query}
+#         ],
+#     )
     
-    response = completion.choices[0].message.content
-    await interaction.response.send_message(response)
+#     response = completion.choices[0].message.content
+#     await interaction.response.send_message(response)
     
 
 # Helper function to encode images to base64.
 # Used to send images to the GPT-4 Vision API.
-def encode_image(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+# def encode_image(image_path):
+#     with open(image_path, "rb") as image_file:
+#         return base64.b64encode(image_file.read()).decode('utf-8')
 
 
-# How to generate memes from images.
-# This sends a meme caption to the user on discord when they upload an image and type "memeify" in the message.
 @client.event
 async def on_message(message):
+    #If bot sends a command, don't run it as itself
     if message.author == client.user:
         return
   
@@ -121,6 +120,7 @@ async def on_message(message):
 
         except Exception as e:
             print("Error:", e)
+            await message.channel.send("An error has occured.")
             return
         
 
@@ -180,6 +180,7 @@ async def on_message(message):
 
         except Exception as e:
             print("Error:", e)
+            await message.channel.send("An error has occured.")
             return
 
                 
