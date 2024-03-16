@@ -8,13 +8,9 @@ from discord.ext import commands
 from discord.ext.commands import cooldown, BucketType
 from discord.app_commands import Choice
 from openai import OpenAI
-from questions import *
-from PIL import Image
-import csv
-import aiohttp
 import base64
 import re
-from bs4 import BeautifulStoneSoup
+from bs4 import BeautifulSoup
 
 KEYS = json.load(open("keys.json"))
 
@@ -59,14 +55,26 @@ def encode_image(image_path):
 # This sends a meme caption to the user on discord when they upload an image and type "memeify" in the message.
 @client.event
 async def on_message(message):
-  
     if message.author == client.user:
         return
   
-    #generate summary from text
-    if message.content.lower().startswith('summary'):
-        # Extract the text after 'summary'
-        input_text = ' '.join(message.content.split()[1:])
+    # Generate summary from text
+    if message.content.lower().startswith('summarize'):
+        split_message = message.content.split()
+        input_text = ' '.join(split_message[2:])  # Extract the text or URL from the message
+        
+        # Check if the user has provided the number of words
+        try:
+            if len(split_message) > 1:
+                num_of_words = int(split_message[1])
+                if num_of_words < 100 or num_of_words > 1000:
+                    await message.channel.send("Number of words should be between 100 and 1000.")
+                    return
+            else:
+                num_of_words = 400  # Set default value to 400 words
+        except ValueError:
+            await message.channel.send("Invalid command format. Please use 'summarize [num_of_words] (text or URL)' to generate summaries.")
+            return
 
         # Check if the input is a URL
         if re.match(r'https?://\S+', input_text):
@@ -86,12 +94,13 @@ async def on_message(message):
             # If it's not a URL, use the input text directly
             text_content = input_text
 
+        print(text_content)
         payload = {
             "model": "google/gemma-7b-it:free",
             "messages": [
                 {
                     "role": "user",
-                    "content": f"Summarize the following, make sure the summary is extremely short: {text_content}."
+                    "content": f"You are a helpful assistant that will follow my directions exactly. Summarize the following, make sure the summary is concise. Only write {num_of_words} words, and do not exceed 2000 characters. Do not give me other information outside of those paragraphs: {text_content}."
                 }
             ]
         }
@@ -123,17 +132,34 @@ async def on_message(message):
         # Extract the number of questions and text content from the message
         try:
             num_questions = int(split_message[1])  # Extract the number from the message
-            text_content = ' '.join(split_message[2:])  # Extract the text content after the number
+            input_text = ' '.join(split_message[2:])  # Extract the text content after the number
         except (ValueError, IndexError):
             await message.channel.send("Invalid command format. Please use 'questions [number] (text)' to generate questions.")
             return
+        
+        if re.match(r'https?://\S+', input_text):
+            # If it's a URL, fetch content from the URL
+            try:
+                response = requests.get(input_text)
+                response.raise_for_status()  # Raise an exception for HTTP errors
+                html_content = response.text
+            except requests.exceptions.RequestException as e:
+                await message.channel.send(f"Error: {e}")
+                return
+
+            # Parse HTML content to extract text
+            soup = BeautifulSoup(html_content, 'html.parser')
+            text_content = soup.get_text()
+        else:
+            # If it's not a URL, use the input text directly
+            text_content = input_text
 
         payload = {
             "model": "google/gemma-7b-it:free",
             "messages": [
                 {
                     "role": "user",
-                    "content": f"Generate {num_questions} questions based on the following. Do not use any other reference, only utilize the text given here: {text_content}. When generaating your response, do not write anything else. Only send the questions. When generating questions, space them out with one single line break, do not use multiple."
+                    "content": f"You are a helpful assistant. Generate {num_questions} questions based on the following. Do not use any other reference, only utilize the text given here: {text_content}. When generaating your response, do not write anything else. Only send the questions. When generating questions, space them out with one single line break, do not use multiple."
                 }
             ]
         }
