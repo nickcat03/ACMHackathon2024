@@ -149,7 +149,7 @@ async def on_message(message):
             response = requests.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {OPEN_BORDER_KEY}",
+                    "Authorization": f"Bearer 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",
                 },
                 data=json.dumps(payload)
             )
@@ -232,7 +232,7 @@ async def on_message(message):
             response = requests.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {OPEN_BORDER_KEY}",
+                    "Authorization": f"Bearer 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",
                 },
                 data=json.dumps(payload)
             )
@@ -276,4 +276,4 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 #  https://www.writebots.com/discord-bot-token/
 #  https://realpython.com/how-to-make-a-discord-bot-python/
 
-client.run(TOKEN)
+client.run(os.environ["DISCORD_TOKEN"])
