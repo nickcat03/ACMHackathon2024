@@ -31,7 +31,7 @@ def extract_text_from_pptx(pptx_bytes):
     return text
 
 
-KEYS = json.load(open("keys.json"))
+#KEYS = json.load(open("keys.json"))
 
 # Initialize Discord bot intents with default settings, including basic events like join/leave.
 intents = discord.Intents.default()
@@ -149,7 +149,7 @@ async def on_message(message):
             response = requests.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {KEYS['OpenBorder']}",
+                    "Authorization": f"Bearer {OPEN_BORDER_KEY}",
                 },
                 data=json.dumps(payload)
             )
@@ -232,7 +232,7 @@ async def on_message(message):
             response = requests.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {KEYS['OpenBorder']}",
+                    "Authorization": f"Bearer {OPEN_BORDER_KEY}",
                 },
                 data=json.dumps(payload)
             )
@@ -276,4 +276,4 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 #  https://www.writebots.com/discord-bot-token/
 #  https://realpython.com/how-to-make-a-discord-bot-python/
 
-client.run(KEYS["DiscordBot"])
+client.run(TOKEN)
