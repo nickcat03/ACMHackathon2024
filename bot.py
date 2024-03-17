@@ -7,14 +7,31 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ext.commands import cooldown, BucketType
 from discord.app_commands import Choice
-from openai import OpenAI
-import base64
 import re
 from bs4 import BeautifulSoup
+from docx import Document
+from pptx import Presentation
+import io
+
+
+def extract_text_from_docx(docx_bytes):
+    doc = Document(io.BytesIO(docx_bytes))
+    text = ''
+    for paragraph in doc.paragraphs:
+        text += paragraph.text + '\n'
+    return text
+
+def extract_text_from_pptx(pptx_bytes):
+    prs = Presentation(io.BytesIO(pptx_bytes))
+    text = ''
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if hasattr(shape, "text"):
+                text += shape.text + '\n'
+    return text
+
 
 KEYS = json.load(open("keys.json"))
-
-openai_client = OpenAI(api_key=KEYS["OpenBorder"])
 
 # Initialize Discord bot intents with default settings, including basic events like join/leave.
 intents = discord.Intents.default()
@@ -50,18 +67,46 @@ client = commands.Bot(command_prefix="!", intents=intents)
 #     with open(image_path, "rb") as image_file:
 #         return base64.b64encode(image_file.read()).decode('utf-8')
 
-
 @client.event
 async def on_message(message):
-    #If bot sends a command, don't run it as itself
+    # If bot sends a command, don't run it as itself
+
+    # Set default number of words
+    num_of_words = 400
+
     if message.author == client.user:
         return
   
     # Generate summary from text
     if message.content.lower().startswith('summarize'):
         split_message = message.content.split()
-        input_text = ' '.join(split_message[2:])  # Extract the text or URL from the message
-        
+        input_text = ''
+
+        # Check for attachments
+        if message.attachments:
+            # Assuming only one attachment is allowed
+            attachment = message.attachments[0]
+            file_extension = attachment.filename.split('.')[-1].lower()
+
+            if file_extension == 'txt':
+                # Text file
+                attachment_content = await attachment.read()
+                input_text = attachment_content.decode('utf-8')
+            elif file_extension in ['doc', 'docx']:
+                # Word document
+                attachment_content = await attachment.read()
+                input_text = extract_text_from_docx(attachment_content)
+            elif file_extension == 'pptx':
+                # PowerPoint document
+                attachment_content = await attachment.read()
+                input_text = extract_text_from_pptx(attachment_content)
+            else:
+                await message.channel.send("Invalid attachment format. Please attach a .txt, .doc, .docx, or .pptx file.")
+                return
+
+        else:
+            input_text = ' '.join(split_message[2:])  # Extract the text or URL from the message
+
         # Check if the user has provided the number of words
         try:
             if len(split_message) > 1:
@@ -69,8 +114,6 @@ async def on_message(message):
                 if num_of_words < 100 or num_of_words > 1000:
                     await message.channel.send("Number of words should be between 100 and 1000.")
                     return
-            else:
-                num_of_words = 400  # Set default value to 400 words
         except ValueError:
             await message.channel.send("Invalid command format. Please use 'summarize [num_of_words] (text or URL)' to generate summaries.")
             return
@@ -82,13 +125,11 @@ async def on_message(message):
                 response = requests.get(input_text)
                 response.raise_for_status()  # Raise an exception for HTTP errors
                 html_content = response.text
+                soup = BeautifulSoup(html_content, 'html.parser')
+                text_content = soup.get_text()
             except requests.exceptions.RequestException as e:
                 await message.channel.send(f"Error: {e}")
                 return
-
-            # Parse HTML content to extract text
-            soup = BeautifulSoup(html_content, 'html.parser')
-            text_content = soup.get_text()
         else:
             # If it's not a URL, use the input text directly
             text_content = input_text
@@ -99,7 +140,7 @@ async def on_message(message):
             "messages": [
                 {
                     "role": "user",
-                    "content": f"You are a helpful assistant that will follow my directions exactly. Summarize the following, make sure the summary is concise. Only write {num_of_words} words, and do not exceed 2000 characters. Do not give me other information outside of those paragraphs: {text_content}."
+                    "content": f"You are a journalist. Summarize the following, make sure the summary is concise. Only write {num_of_words} words, and do not exceed 2000 characters. Do not give me other information outside of those paragraphs: {text_content}."
                 }
             ]
         }
@@ -119,9 +160,7 @@ async def on_message(message):
             await message.channel.send(summary)
 
         except Exception as e:
-            print("Error:", e)
-            await message.channel.send("An error has occured.")
-            return
+            await message.channel.send(f"An error occurred: {str(e)}")
         
 
     #generate questions from text
@@ -136,6 +175,31 @@ async def on_message(message):
         except (ValueError, IndexError):
             await message.channel.send("Invalid command format. Please use 'questions [number] (text)' to generate questions.")
             return
+        
+        # Check for attachments
+        if message.attachments:
+            # Assuming only one attachment is allowed
+            attachment = message.attachments[0]
+            file_extension = attachment.filename.split('.')[-1].lower()
+
+            if file_extension == 'txt':
+                # Text file
+                attachment_content = await attachment.read()
+                input_text = attachment_content.decode('utf-8')
+            elif file_extension in ['doc', 'docx']:
+                # Word document
+                attachment_content = await attachment.read()
+                input_text = extract_text_from_docx(attachment_content)
+            elif file_extension == 'pptx':
+                # PowerPoint document
+                attachment_content = await attachment.read()
+                input_text = extract_text_from_pptx(attachment_content)
+            else:
+                await message.channel.send("Invalid attachment format. Please attach a .txt, .doc, .docx, or .pptx file.")
+                return
+
+        else:
+            input_text = ' '.join(split_message[2:])  # Extract the text or URL from the message
         
         if re.match(r'https?://\S+', input_text):
             # If it's a URL, fetch content from the URL
@@ -159,7 +223,7 @@ async def on_message(message):
             "messages": [
                 {
                     "role": "user",
-                    "content": f"You are a helpful assistant. Generate {num_questions} questions based on the following. Do not use any other reference, only utilize the text given here: {text_content}. When generaating your response, do not write anything else. Only send the questions. When generating questions, space them out with one single line break, do not use multiple."
+                    "content": f"You are a helpful assistant. Generate {num_questions} questions based on the following. Do not use any other reference, only utilize the text given here: {text_content}. When generaating your response, do not write anything else. Only send the questions. When generating questions, space them out with one single line break, do not use multiple. Generate {num_questions} questions."
                 }
             ]
         }
